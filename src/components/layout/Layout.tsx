@@ -1,10 +1,5 @@
-import { NavLink, useNavigate } from 'react-router-dom'
-import { logout } from '../../utils/auth'
-
-interface Props {
-  children: React.ReactNode
-  onLogout: () => void
-}
+import { NavLink } from 'react-router-dom'
+import { supabase } from '../../utils/supabase'
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
   `text-sm px-3 py-1.5 rounded-md transition-colors ${
@@ -13,15 +8,7 @@ const navClass = ({ isActive }: { isActive: boolean }) =>
       : 'text-stone-400 hover:text-stone-100'
   }`
 
-export default function Layout({ children, onLogout }: Props) {
-  const navigate = useNavigate()
-
-  function handleLogout() {
-    logout()
-    onLogout()
-    navigate('/')
-  }
-
+export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-stone-950 text-stone-100">
       <header className="border-b border-stone-800 px-4 py-3">
@@ -32,7 +19,7 @@ export default function Layout({ children, onLogout }: Props) {
             <NavLink to="/historik" className={navClass}>Historik</NavLink>
             <NavLink to="/ny" className={navClass}>+ Ny mätning</NavLink>
             <button
-              onClick={handleLogout}
+              onClick={() => supabase.auth.signOut()}
               className="text-sm text-stone-500 hover:text-stone-300 ml-3 transition-colors"
             >
               Logga ut

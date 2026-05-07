@@ -1,12 +1,11 @@
 import { useState } from 'react'
-import { hasPassword, checkPassword, setPassword } from '../../utils/auth'
+import { supabase } from '../../utils/supabase'
 
-interface Props {
-  onAuth: () => void
-}
+type Mode = 'login' | 'signup'
 
-export default function LoginGate({ onAuth }: Props) {
-  const firstTime = !hasPassword()
+export default function LoginGate() {
+  const [mode, setMode] = useState<Mode>('login')
+  const [email, setEmail] = useState('')
   const [pw, setPw] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
@@ -17,20 +16,14 @@ export default function LoginGate({ onAuth }: Props) {
     setError('')
     setLoading(true)
 
-    if (firstTime) {
+    if (mode === 'signup') {
       if (pw.length < 6) { setError('Minst 6 tecken.'); setLoading(false); return }
       if (pw !== confirm) { setError('Lösenorden matchar inte.'); setLoading(false); return }
-      await setPassword(pw)
-      await checkPassword(pw)
-      onAuth()
+      const { error } = await supabase.auth.signUp({ email, password: pw })
+      if (error) { setError(error.message); setLoading(false) }
     } else {
-      const ok = await checkPassword(pw)
-      if (ok) {
-        onAuth()
-      } else {
-        setError('Fel lösenord.')
-        setLoading(false)
-      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password: pw })
+      if (error) { setError('Fel e-post eller lösenord.'); setLoading(false) }
     }
   }
 
@@ -42,25 +35,35 @@ export default function LoginGate({ onAuth }: Props) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs text-stone-400 mb-1">
-              {firstTime ? 'Välj lösenord' : 'Lösenord'}
-            </label>
+            <label className="block text-xs text-stone-400 mb-1">E-post</label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              autoFocus
+              required
+              className="w-full bg-stone-900 border border-stone-700 rounded-lg px-3 py-2.5 text-stone-100 focus:outline-none focus:border-teal-500 transition-colors"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-stone-400 mb-1">Lösenord</label>
             <input
               type="password"
               value={pw}
               onChange={e => setPw(e.target.value)}
-              autoFocus
+              required
               className="w-full bg-stone-900 border border-stone-700 rounded-lg px-3 py-2.5 text-stone-100 focus:outline-none focus:border-teal-500 transition-colors"
             />
           </div>
 
-          {firstTime && (
+          {mode === 'signup' && (
             <div>
               <label className="block text-xs text-stone-400 mb-1">Bekräfta lösenord</label>
               <input
                 type="password"
                 value={confirm}
                 onChange={e => setConfirm(e.target.value)}
+                required
                 className="w-full bg-stone-900 border border-stone-700 rounded-lg px-3 py-2.5 text-stone-100 focus:outline-none focus:border-teal-500 transition-colors"
               />
             </div>
@@ -73,9 +76,25 @@ export default function LoginGate({ onAuth }: Props) {
             disabled={loading}
             className="w-full bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors"
           >
-            {firstTime ? 'Skapa lösenord' : 'Logga in'}
+            {loading ? '...' : mode === 'login' ? 'Logga in' : 'Skapa konto'}
           </button>
         </form>
+
+        <p className="text-stone-500 text-sm mt-4 text-center">
+          {mode === 'login' ? (
+            <>Inget konto?{' '}
+              <button onClick={() => { setMode('signup'); setError('') }} className="text-teal-400 hover:text-teal-300">
+                Skapa ett
+              </button>
+            </>
+          ) : (
+            <>Har du redan ett konto?{' '}
+              <button onClick={() => { setMode('login'); setError('') }} className="text-teal-400 hover:text-teal-300">
+                Logga in
+              </button>
+            </>
+          )}
+        </p>
       </div>
     </div>
   )
