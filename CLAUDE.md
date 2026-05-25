@@ -5,10 +5,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm run dev       # Start dev server (Vite, localhost:5173)
-npm run build     # Type-check + production build
-npm run lint      # ESLint
-npm run preview   # Preview production build
+yarn dev       # Start dev server (Vite, localhost:5173)
+yarn build     # Type-check + production build
+yarn lint      # ESLint
+yarn preview   # Preview production build
 ```
 
 No test suite is configured.
