@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { MeasurementEntry } from '../types'
 import { supabase } from '../utils/supabase'
+import { mergeSameDate, findByDate } from '../utils/entryMerge'
 
 function fromRow(row: Record<string, unknown>): MeasurementEntry {
   return {
@@ -28,11 +29,20 @@ export function useMeasurements(userId: string) {
   }, [userId])
 
   const addEntry = useCallback(async (entry: MeasurementEntry) => {
+    const existing = findByDate(entries, entry.date)
+    if (existing) {
+      const merged = mergeSameDate(existing, entry)
+      const { error } = await supabase.from('measurements')
+        .update({ date: merged.date, note: merged.note, values: merged.values })
+        .eq('id', merged.id)
+      if (!error) setEntries(prev => prev.map(e => e.id === merged.id ? merged : e))
+      return
+    }
     const { error } = await supabase.from('measurements').insert({
       id: entry.id, user_id: userId, date: entry.date, note: entry.note, values: entry.values,
     })
     if (!error) setEntries(prev => [...prev, entry].sort((a, b) => a.date.localeCompare(b.date)))
-  }, [userId])
+  }, [userId, entries])
 
   const updateEntry = useCallback(async (entry: MeasurementEntry) => {
     const { error } = await supabase.from('measurements')

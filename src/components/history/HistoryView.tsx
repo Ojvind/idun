@@ -6,6 +6,7 @@ import {
 import type { MeasurementEntry, MeasurementKey } from '../../types'
 import { FIELDS } from '../../utils/fields'
 import { exportJSON, importJSON } from '../../utils/storage'
+import { quarterlyTicks, monthlyTicks } from '../../utils/chartTicks'
 
 const MONTHS_SV = ['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec']
 const DAY_MS = 86_400_000
@@ -16,27 +17,36 @@ type ChartDatum = {
   value: number | undefined
 }
 
-function quarterlyTicks(minTs: number, maxTs: number): number[] {
-  const start = new Date(minTs)
-  start.setDate(1)
-  start.setMonth(Math.floor(start.getMonth() / 3) * 3)
-  start.setHours(0, 0, 0, 0)
+type RangeKey = '6m' | '1y' | '2y' | 'all'
+const RANGES: { key: RangeKey; label: string; months: number | null }[] = [
+  { key: '6m',  label: '6 mån', months: 6 },
+  { key: '1y',  label: '1 år',  months: 12 },
+  { key: '2y',  label: '2 år',  months: 24 },
+  { key: 'all', label: 'Allt',  months: null },
+]
 
-  const ticks: number[] = []
-  const cur = new Date(start)
-  while (cur.getTime() <= maxTs) {
-    ticks.push(cur.getTime())
-    cur.setMonth(cur.getMonth() + 3)
-  }
-  return ticks
-}
 
-function renderTimeTick() {
+function renderTimeTick(showAllMonths: boolean) {
   return function Tick(props: any) {
     const { x, y, payload } = props
     const date = new Date(payload.value)
     const month = date.getMonth()
     const isJan = month === 0
+
+    if (showAllMonths) {
+      return (
+        <g transform={`translate(${x},${y + 6})`}>
+          {isJan && (
+            <text x={0} y={0} textAnchor="middle" fill="#c8c5c2" fontSize={10} fontWeight="700">
+              {date.getFullYear()}
+            </text>
+          )}
+          <text x={0} y={isJan ? 15 : 10} textAnchor="middle" fill={isJan ? '#78716c' : '#4a4540'} fontSize={10}>
+            {MONTHS_SV[month]}
+          </text>
+        </g>
+      )
+    }
 
     return (
       <g transform={`translate(${x},${y + 6})`}>
@@ -61,8 +71,9 @@ export default function HistoryView({ entries, onDelete, onImport }: Props) {
   const navigate = useNavigate()
   const [activeKey, setActiveKey] = useState<MeasurementKey>('navel')
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [range, setRange] = useState<RangeKey>('all')
 
-  const chartData: ChartDatum[] = entries
+  const allChartData: ChartDatum[] = entries
     .filter(e => e.values[activeKey] !== undefined)
     .map(e => ({
       date: e.date,
@@ -70,13 +81,21 @@ export default function HistoryView({ entries, onDelete, onImport }: Props) {
       value: e.values[activeKey],
     }))
 
+  const rangeMonths = RANGES.find(r => r.key === range)?.months ?? null
+  const rangeStartTs = rangeMonths ? Date.now() - rangeMonths * 30.44 * DAY_MS : null
+  const chartData = rangeStartTs ? allChartData.filter(d => d.ts >= rangeStartTs) : allChartData
+
+  const useMonthlyTicks = range === '6m' || range === '1y'
+  const domainStart = rangeStartTs ? rangeStartTs - 10 * DAY_MS : chartData.length > 0 ? chartData[0].ts - 45 * DAY_MS : 'auto'
+  const domainEnd = chartData.length > 0 ? chartData[chartData.length - 1].ts + (rangeStartTs ? 10 * DAY_MS : 45 * DAY_MS) : 'auto'
+
+  const tickMin = typeof domainStart === 'number' ? domainStart : chartData[0]?.ts ?? 0
+  const tickMax = typeof domainEnd === 'number' ? domainEnd : chartData[chartData.length - 1]?.ts ?? 0
   const ticks = chartData.length > 0
-    ? quarterlyTicks(chartData[0].ts, chartData[chartData.length - 1].ts)
+    ? (useMonthlyTicks ? monthlyTicks(tickMin, tickMax) : quarterlyTicks(tickMin, tickMax))
     : []
 
-  const domain = chartData.length > 0
-    ? [chartData[0].ts - 45 * DAY_MS, chartData[chartData.length - 1].ts + 45 * DAY_MS]
-    : ['auto', 'auto']
+  const domain: [number | string, number | string] = [domainStart, domainEnd]
 
   async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -115,7 +134,7 @@ export default function HistoryView({ entries, onDelete, onImport }: Props) {
       </div>
 
       <div>
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="flex flex-wrap gap-2 mb-3">
           {FIELDS.map(f => (
             <button
               key={f.key}
@@ -127,6 +146,21 @@ export default function HistoryView({ entries, onDelete, onImport }: Props) {
               }`}
             >
               {f.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-1.5 mb-4">
+          {RANGES.map(r => (
+            <button
+              key={r.key}
+              onClick={() => setRange(r.key)}
+              className={`text-xs px-2.5 py-1 rounded-md border transition-colors ${
+                range === r.key
+                  ? 'bg-stone-700 border-stone-600 text-stone-100'
+                  : 'border-stone-800 text-stone-500 hover:border-stone-700 hover:text-stone-300'
+              }`}
+            >
+              {r.label}
             </button>
           ))}
         </div>
@@ -144,7 +178,7 @@ export default function HistoryView({ entries, onDelete, onImport }: Props) {
                   type="number"
                   domain={domain}
                   ticks={ticks}
-                  tick={renderTimeTick()}
+                  tick={renderTimeTick(useMonthlyTicks)}
                   tickLine={false}
                   interval={0}
                   height={50}
@@ -174,7 +208,7 @@ export default function HistoryView({ entries, onDelete, onImport }: Props) {
                       x={t}
                       stroke={isJan ? '#4a4540' : '#252220'}
                       strokeWidth={isJan ? 1.5 : 1}
-                      strokeDasharray={isJan ? undefined : '3 4'}
+                      strokeDasharray={isJan || useMonthlyTicks ? undefined : '3 4'}
                     />
                   )
                 })}
