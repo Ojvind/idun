@@ -85,12 +85,16 @@ export default function HistoryView({ entries, onDelete, onImport }: Props) {
   const rangeStartTs = rangeMonths ? Date.now() - rangeMonths * 30.44 * DAY_MS : null
   const chartData = rangeStartTs ? allChartData.filter(d => d.ts >= rangeStartTs) : allChartData
 
-  const useMonthlyTicks = range === '6m' || range === '1y'
-  const domainStart = rangeStartTs ? rangeStartTs - 10 * DAY_MS : chartData.length > 0 ? chartData[0].ts - 45 * DAY_MS : 'auto'
-  const domainEnd = chartData.length > 0 ? chartData[chartData.length - 1].ts + (rangeStartTs ? 10 * DAY_MS : 45 * DAY_MS) : 'auto'
+  const dataStart = chartData.length > 0 ? chartData[0].ts : null
+  const dataEnd = chartData.length > 0 ? chartData[chartData.length - 1].ts : null
+  const spanMonths = dataStart && dataEnd ? (dataEnd - dataStart) / (30.44 * DAY_MS) : 0
+  const useMonthlyTicks = spanMonths <= 13
+  const padding = useMonthlyTicks ? 15 * DAY_MS : 45 * DAY_MS
+  const domainStart = dataStart ? dataStart - padding : 'auto'
+  const domainEnd = dataEnd ? dataEnd + padding : 'auto'
 
-  const tickMin = typeof domainStart === 'number' ? domainStart : chartData[0]?.ts ?? 0
-  const tickMax = typeof domainEnd === 'number' ? domainEnd : chartData[chartData.length - 1]?.ts ?? 0
+  const tickMin = typeof domainStart === 'number' ? domainStart : dataStart ?? 0
+  const tickMax = typeof domainEnd === 'number' ? domainEnd : dataEnd ?? 0
   const ticks = chartData.length > 0
     ? (useMonthlyTicks ? monthlyTicks(tickMin, tickMax) : quarterlyTicks(tickMin, tickMax))
     : []
