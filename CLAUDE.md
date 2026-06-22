@@ -13,6 +13,10 @@ yarn preview   # Preview production build
 
 No test suite is configured.
 
+## Deployment
+
+Hosted on Vercel at `idun.otterbjork.se`. Vercel is connected to the GitHub repo (`Ojvind/idun`) and auto-deploys on every push to `master`. To deploy: push to `origin master`.
+
 ## Environment
 
 Requires a `.env` file with:
