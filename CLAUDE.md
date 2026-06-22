@@ -37,6 +37,20 @@ React 19 + TypeScript + Vite app for tracking body measurements. UI is entirely 
 
 **Measurement fields:** Defined centrally in `src/utils/fields.ts` as a `FIELDS` array. The `MeasurementKey` union type in `src/types/index.ts` is the source of truth for the 9 tracked metrics (weight, navel, waist, chest, biceps×2, thighs×2, hips). Values stored as `Partial<Record<MeasurementKey, number>>` in a JSONB column.
 
-**Supabase schema:** Single `measurements` table with columns `id`, `user_id`, `date`, `note`, `values` (JSONB). RLS is configured in the Supabase console (not in code).
+**Supabase schema:** Single `measurements` table:
+
+| Column    | Type    | Notes                              |
+|-----------|---------|------------------------------------|
+| `id`      | uuid    | Primary key, generated client-side |
+| `user_id` | uuid    | FK to `auth.users`, set on insert  |
+| `date`    | date    | ISO string (YYYY-MM-DD), ordered ascending |
+| `note`    | text    | Optional free-text note            |
+| `values`  | jsonb   | `Partial<Record<MeasurementKey, number>>` — all fields optional |
+
+`values` keys: `weight` (kg), `navel`, `waist`, `chest`, `leftBicep`, `rightBicep`, `leftThigh`, `rightThigh`, `hips` (all cm).
+
+RLS is configured in the Supabase console (not in code) — users can only read/write their own rows. The client never filters by `user_id` explicitly; RLS handles it.
+
+If two entries share the same `date`, `addEntry` merges them client-side (non-null values from the new entry win) and updates the existing row rather than inserting.
 
 **Import/Export:** `src/utils/storage.ts` handles JSON file export/import as a local backup mechanism (separate from Supabase persistence).
