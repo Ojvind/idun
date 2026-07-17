@@ -11,11 +11,14 @@ jobs:
     steps:
       - name: Ping Supabase
         run: |
+          # Query a real table so the request counts as database activity;
+          # a bare GET /rest/v1/ never reaches Postgres and does not prevent pausing.
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            "${{ secrets.SUPABASE_URL }}/rest/v1/" \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}")
+            "${{ secrets.SUPABASE_URL }}/rest/v1/measurements?select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
           echo "Status: $STATUS"
-          if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 500 ]; then
+          if [ "$STATUS" != "200" ]; then
             echo "Unexpected status $STATUS"
             exit 1
           fi
